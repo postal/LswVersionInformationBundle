@@ -1,5 +1,6 @@
 <?php
 namespace Lsw\VersionInformationBundle\DataCollector;
+
 use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\HttpKernel\DataCollector\DataCollector;
 use Symfony\Component\HttpFoundation\Request;
@@ -18,6 +19,7 @@ class VersionInformationDataCollector extends DataCollector
 
     const SVN = 'svn';
     const GIT = 'git';
+    const NONE = 'none';
 
     /**
      * Class constructor
@@ -38,7 +40,7 @@ class VersionInformationDataCollector extends DataCollector
             return;
         }
 
-        $this->data = (object) array();
+        $this->data = (object)array();
         $dumper = new \Symfony\Component\Yaml\Dumper();
         $container = $this->kernel->getContainer();
         $rootDir = realpath($container->getParameter('root_dir') ?: $this->kernel->getRootDir() . '/../');
@@ -50,14 +52,14 @@ class VersionInformationDataCollector extends DataCollector
             $this->data->mode = self::GIT;
             $this->collectGit($rootDir, $request, $response, $exception);
         } else {
-            throw new \Exception('Could not find Subversion or Git.');
+            $this->data->mode = self::NONE;
         }
 
     }
 
     private function collectGit($rootDir, Request $request, Response $response, \Exception $exception = null)
     {
-        $process = new Process('cd '.$rootDir.'; git --no-pager show-ref --dereference');
+        $process = new Process('cd ' . $rootDir . '; git --no-pager show-ref --dereference');
         $process->run();
         $output = $process->getOutput();
         if (!$process->isSuccessful()) {
@@ -71,17 +73,17 @@ class VersionInformationDataCollector extends DataCollector
             throw new \Exception($process->getErrorOutput());
         }
 
-        $refs = explode("\n",trim($output));
-        $head = substr($refs[0],41);
+        $refs = explode("\n", trim($output));
+        $head = substr($refs[0], 41);
         foreach ($refs as $ref) {
             if (strstr($ref, $currentBranch)) {
-                $head = substr($ref,41);
+                $head = substr($ref, 41);
                 break;
             }
         }
         foreach ($refs as $ref) {
-            $remote = substr($ref,41);
-            if (stripos($remote,'origin')!==false && stripos($remote,'master')!==false) {
+            $remote = substr($ref, 41);
+            if (stripos($remote, 'origin') !== false && stripos($remote, 'master') !== false) {
                 break;
             }
         }
@@ -113,7 +115,7 @@ class VersionInformationDataCollector extends DataCollector
         $this->data->status = $output ? explode("\n", trim($output)) : array();
         $this->data->statusText = $output;
 
-        $process = new Process('git --no-pager log --pretty=format: '.$ahead.' --name-status ' . $rootDir);
+        $process = new Process('git --no-pager log --pretty=format: ' . $ahead . ' --name-status ' . $rootDir);
         $process->run();
         $output = trim($process->getOutput());
         if (!$process->isSuccessful()) {
@@ -122,7 +124,7 @@ class VersionInformationDataCollector extends DataCollector
         $this->data->ahead = $output ? explode("\n", trim($output)) : array();
         $this->data->ahead = array_filter($this->data->ahead);
 
-        $process = new Process('git --no-pager log '.$ahead.' --name-status ' . $rootDir);
+        $process = new Process('git --no-pager log ' . $ahead . ' --name-status ' . $rootDir);
         $process->run();
         $output = trim($process->getOutput());
         if (!$process->isSuccessful()) {
@@ -130,7 +132,7 @@ class VersionInformationDataCollector extends DataCollector
         }
         $this->data->aheadText = $output;
 
-        $process = new Process('git --no-pager log --pretty=format: '.$behind.' --name-status ' . $rootDir);
+        $process = new Process('git --no-pager log --pretty=format: ' . $behind . ' --name-status ' . $rootDir);
         $process->run();
         $output = $process->getOutput();
         if (!$process->isSuccessful()) {
@@ -139,7 +141,7 @@ class VersionInformationDataCollector extends DataCollector
         $this->data->behind = $output ? explode("\n", trim($output)) : array();
         $this->data->behind = array_filter($this->data->behind);
 
-        $process = new Process('git --no-pager log '.$behind.' --name-status ' . $rootDir);
+        $process = new Process('git --no-pager log ' . $behind . ' --name-status ' . $rootDir);
         $process->run();
         $output = $process->getOutput();
         if (!$process->isSuccessful()) {
@@ -149,9 +151,12 @@ class VersionInformationDataCollector extends DataCollector
 
     }
 
-    private function collectSvn($rootDir, Request $request, Response $response,
-            \Exception $exception = null)
-    {
+    private function collectSvn(
+        $rootDir,
+        Request $request,
+        Response $response,
+        \Exception $exception = null
+    ) {
         $process = new Process('svn info --xml ' . $rootDir);
         $process->run();
         $output = $process->getOutput();
@@ -204,7 +209,7 @@ class VersionInformationDataCollector extends DataCollector
     {
         if ($this->data->mode == self::SVN) {
             return $this->data->information->entry->commit->{'@attributes'}
-                    ->revision;
+                ->revision;
         } elseif ($this->data->mode == self::GIT) {
             return $this->data->information->hash;
         }
@@ -233,8 +238,8 @@ class VersionInformationDataCollector extends DataCollector
     {
         if ($this->data->mode == self::SVN) {
             return str_replace(
-                    $this->data->information->entry->repository->root, '',
-                    $this->data->information->entry->url);
+                $this->data->information->entry->repository->root, '',
+                $this->data->information->entry->url);
         } elseif ($this->data->mode == self::GIT) {
             return $this->data->information->branch;
         }
@@ -340,6 +345,7 @@ class VersionInformationDataCollector extends DataCollector
     {
         return $this->data->behindText;
     }
+
     /**
      * {@inheritdoc}
      */
